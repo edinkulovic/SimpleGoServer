@@ -7,6 +7,21 @@ TODO:: Add more details what we will cover, why and maybe even some diagrams
 2. Setup GO Workspace (...) :: TODO: Add more description
 3. Setup Docker             :: TODO: Add more description
 
+# Docker 
+## Creating an image for this docker locally
+docker build -t simple-go-server .
+
+## Starting docker container
+docker run (-d DETACHED) (-p MACHINE_PORT:DOCKER_PORT) (IMAGE_NAME)
+docker run -d -p 8000:8000 simple-go-server
+docker run -d -p 8001:8000 simple-go-server
+
+## Reading the list of running containers
+docker ps
+
+## Stoping the docker Container by Container ID 
+docker stop CONTAINER_ID
+
 # API Testing
 ## Postman
  * We will use Postman (Which is chrome extension) to test and document our API calls.

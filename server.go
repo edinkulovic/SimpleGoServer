@@ -1,62 +1,82 @@
 package main
 
 import (
-	"encoding/json"
-	"io"
+	"database/sql"
+	"fmt"
 	"net/http"
+	"strconv"
+	"time"
 
-	"github.com/edinkulovic/SimpleGoServer/models"
+	"github.com/edinkulovic/SimpleGoServer/app/config"
+	"github.com/edinkulovic/SimpleGoServer/app/db"
+	"github.com/edinkulovic/SimpleGoServer/app/routeHandler"
 )
 
-/** Health check method for validating if server is live. **/
-func healtCheck(writer http.ResponseWriter, request *http.Request) {
-	writer.Header().Set("Content-Type", "plain/text")
-	writer.WriteHeader(200)
-	writer.Write([]byte("The beast is live"))
+// AppConfig Property Stores the Configuration retrieved from environment files
+var AppConfig config.Config
+var mux map[string]func(http.ResponseWriter, *http.Request) (int, error)
+var sqlDb *sql.DB
+
+type appContext struct {
+	db     *sql.DB
+	config config.Config
 }
-
-/** Retrieve Test User. **/
-func getUser(writer http.ResponseWriter, request *http.Request) {
-	// Creating Test User
-	testUser := models.User{
-		ID:        1,
-		FirstName: "John",
-		LastName:  "Doe",
-		UserName:  "john.doe",
-		Email:     "john.doe@johndoe.it",
-		Password:  "JohnDoe",
-	}
-	// NOTE: Second parameter error will not be handled for now
-	userMarshalObject, _ := json.Marshal(testUser)
-
-	writer.Header().Set("Content-Type", "application/json")
-	writer.WriteHeader(200)
-	writer.Write([]byte(userMarshalObject))
-
-}
-
-var mux map[string]func(http.ResponseWriter, *http.Request)
 
 func main() {
-	server := http.Server{
-		Addr:    ":8000",
-		Handler: &mainServerHandler{},
+	// Load Application Configurations
+	AppConfig, err := config.Load()
+	if err != nil {
+		panic(fmt.Errorf("Invalid application configuration: %s", err))
 	}
 
-	mux = make(map[string]func(http.ResponseWriter, *http.Request))
-	mux["/"] = healtCheck
-	mux["/user"] = getUser
+	// Connect to Database Server
+	sqlDb, err := db.Connect(AppConfig.DatabaseUser, AppConfig.DatabasePass, AppConfig.DatabaseName)
+	if err != nil {
+		panic(fmt.Errorf("Unable to connect to database: %s", err))
+	}
 
-	server.ListenAndServe()
+	defer sqlDb.Close()
+
+	// Setup Http Server
+	server := http.Server{
+		Addr:         ":" + strconv.Itoa(AppConfig.ServerPort),
+		Handler:      &mainServerHandler{},
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+	}
+
+	// Initialize Route Handler
+	mux = routeHandler.Init(sqlDb)
+
+	// Start the server
+	err = server.ListenAndServe()
+
+	if err != nil {
+		panic(fmt.Errorf("Unable to start server: %s", err))
+	}
+
+	fmt.Println("Starting Server at port: " + strconv.Itoa(AppConfig.ServerPort))
 }
 
 type mainServerHandler struct{}
 
 func (*mainServerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if h, ok := mux[r.URL.String()]; ok {
-		h(w, r)
-		return
-	}
+	w.Header().Set("Content-Type", "application/json charset=UTF-8")
 
-	io.WriteString(w, "My server: "+r.URL.String())
+	if h, ok := mux[r.URL.Path]; ok { // Check if route exists
+		status, err := h(w, r)
+		if err != nil {
+			switch status {
+			case http.StatusNotFound, http.StatusInternalServerError:
+				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			case http.StatusBadRequest:
+				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			default:
+				// Catch any other errors we haven't explicitly handled
+				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			}
+		}
+	} else {
+		http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+	}
 }
