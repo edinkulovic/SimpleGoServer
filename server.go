@@ -1,7 +1,6 @@
 package main
 
 import (
-	"database/sql"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -15,10 +14,8 @@ import (
 // AppConfig Property Stores the Configuration retrieved from environment files
 var AppConfig config.Config
 var mux map[string]func(http.ResponseWriter, *http.Request) (int, error)
-var sqlDb *sql.DB
 
 type appContext struct {
-	db     *sql.DB
 	config config.Config
 }
 
@@ -30,12 +27,12 @@ func main() {
 	}
 
 	// Connect to Database Server
-	sqlDb, err := db.Connect(AppConfig.DatabaseUser, AppConfig.DatabasePass, AppConfig.DatabaseName)
+	db.DB, err = db.Connect(AppConfig.DatabaseUser, AppConfig.DatabasePass, AppConfig.DatabaseName)
 	if err != nil {
 		panic(fmt.Errorf("Unable to connect to database: %s", err))
 	}
 
-	defer sqlDb.Close()
+	defer db.DB.Close()
 
 	// Setup Http Server
 	server := http.Server{
@@ -46,7 +43,7 @@ func main() {
 	}
 
 	// Initialize Route Handler
-	mux = routeHandler.Init(sqlDb)
+	mux = routeHandler.Init()
 
 	// Start the server
 	err = server.ListenAndServe()
