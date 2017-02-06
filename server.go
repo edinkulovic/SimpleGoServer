@@ -45,14 +45,14 @@ func main() {
 	// Initialize Route Handler
 	mux = routeHandler.Init()
 
+	fmt.Println("Starting Server at port: " + strconv.Itoa(AppConfig.ServerPort))
+
 	// Start the server
 	err = server.ListenAndServe()
 
 	if err != nil {
 		panic(fmt.Errorf("Unable to start server: %s", err))
 	}
-
-	fmt.Println("Starting Server at port: " + strconv.Itoa(AppConfig.ServerPort))
 }
 
 type mainServerHandler struct{}
@@ -68,6 +68,8 @@ func (*mainServerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			case http.StatusBadRequest:
 				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			case http.StatusUnauthorized:
+				http.Error(w, err.Error(), http.StatusUnauthorized)
 			default:
 				// Catch any other errors we haven't explicitly handled
 				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)

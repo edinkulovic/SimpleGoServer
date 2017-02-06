@@ -3,13 +3,23 @@ package user
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+
+	"strconv"
 
 	"github.com/edinkulovic/SimpleGoServer/models"
 )
 
 type (
 	UserRoutes struct{}
+)
+
+type (
+	LoginRequest struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
 )
 
 // GetByUsername Method retrieves user by Username
@@ -40,16 +50,37 @@ func (ur UserRoutes) Login(writer http.ResponseWriter, request *http.Request) (i
 		return http.StatusMethodNotAllowed, errors.New(http.StatusText(http.StatusMethodNotAllowed))
 	}
 
-	username := request.URL.Query().Get("username")
-	password := request.URL.Query().Get("password")
-	// Empty Struct does not take any memory models.User{}
-	user, err := models.User{}.Login(username, password)
+	var loginRequest LoginRequest
+
+	if request.Body == nil {
+		return http.StatusBadRequest, errors.New("Body Empty")
+	}
+
+	err := json.NewDecoder(request.Body).Decode(&loginRequest)
 
 	if err != nil {
-		// TODO: Logging
-		// TODO: Add custom Status Codes
+		fmt.Println(err)
+		return http.StatusBadRequest, errors.New("Incorrec Body Format")
+	}
+
+	// Empty Struct does not take any memory models.User{}
+	user, err := models.User{}.Login(loginRequest.Username, loginRequest.Password)
+
+	if err != nil {
+		fmt.Println(err)
+		return http.StatusUnauthorized, errors.New("Username or Password is Incorrect")
+	}
+
+	token, expiration, err := models.Claims{}.CreateToken(user.UserName)
+
+	if err != nil {
+		fmt.Println(err)
 		return http.StatusUnauthorized, err
 	}
+
+	// TODO: Move this into Redis DB
+	writer.Header().Set("Token", token)
+	writer.Header().Set("TokenExpiration", strconv.FormatInt(int64(expiration), 10))
 
 	// NOTE: Second parameter error will not be handled for now
 	userMarshalObject, _ := json.Marshal(user)

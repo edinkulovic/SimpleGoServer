@@ -1,10 +1,6 @@
 package models
 
-import (
-	"fmt"
-
-	"github.com/edinkulovic/SimpleGoServer/app/db"
-)
+import "github.com/edinkulovic/SimpleGoServer/app/db"
 
 type (
 	// User represents the structure of our resource
@@ -31,6 +27,5 @@ func (u User) Login(username, password string) (User, error) {
 func (u User) GetByUsername(username string) (User, error) {
 	err := db.DB.QueryRow("SELECT ID, Username, FirstName, LastName, Age FROM Users WHERE Username=?", username).Scan(
 		&u.ID, &u.UserName, &u.FirstName, &u.LastName, &u.Age)
-	fmt.Println(err)
 	return u, err
 }
