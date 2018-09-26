@@ -1,3 +1,5 @@
+# This entire code is obsolete. Need to update :)
+
 # Simple Go Server 
 Simple test project to learn GO. 
 TODO:: Add more details what we will cover, why and maybe even some diagrams  
